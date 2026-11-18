@@ -42,7 +42,6 @@ jobs:
         cp dist/syspulse "${ROOT}/usr/bin/${PKG}"
         chmod 755 "${ROOT}/usr/bin/${PKG}"
         
-        # Создаем control файл БЕЗ использования EOF (чтобы YAML не ломался)
         echo "Package: ${PKG}" > "${ROOT}/DEBIAN/control"
         echo "Version: ${VER}" >> "${ROOT}/DEBIAN/control"
         echo "Section: utils" >> "${ROOT}/DEBIAN/control"
