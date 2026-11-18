@@ -59,7 +59,7 @@ jobs:
 
     - name: Upload .deb to Nexus using dput in Docker
       run: |
-        DEB_FILE="${{ steps.pack.outputs.deb_path }}"
+        DEB_FILE=$(basename "${{ steps.pack.outputs.deb_path }}")
         
         cat > dput.cf << EOF
         [syspulse]
@@ -71,10 +71,9 @@ jobs:
         allow_unsigned_uploads = 1
         EOF
         
-        
         docker run --rm -v "$PWD:/work" -w /work ubuntu:22.04 bash -c "
           apt-get update -y && apt-get install -y dput ca-certificates
-          dput -f syspulse syspulse_${{ steps.pack.outputs.pkg_ver }}_amd64.deb
+          dput -c /work/dput.cf -f syspulse ${DEB_FILE}
         "
         echo "Пакет успешно загружен в Nexus!"
 
