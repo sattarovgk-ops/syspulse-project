@@ -60,13 +60,14 @@ jobs:
     - name: Upload .deb to Nexus
       run: |
         DEB=$(basename "${{ steps.pack.outputs.deb_path }}")
-        URL="http://${{ secrets.NEXUS_HOST }}:8081/repository/syspulse/deb/binary/${{ env.APT_DIST }}/${{ env.APT_COMPONENT }}/syspulse/binary/amd64/${DEB}"
+        URL="http://${{ secrets.NEXUS_HOST }}:8081/repository/syspulse/${DEB}"
+        echo "Отправка на URL: ${URL}"
         curl --fail --silent --show-error \
           --user "${{ secrets.NEXUS_USER }}:${{ secrets.NEXUS_PASSWORD }}" \
           -H "Content-Type: application/vnd.debian.binary-package" \
           --upload-file "${{ steps.pack.outputs.deb_path }}" \
           "${URL}"
-        echo "✓ Пакет ${DEB} успешно загружен в Nexus!"
+        echo "Пакет ${DEB} успешно загружен в Nexus!"
 
     - name: Verify install via apt in Ubuntu container
       run: |
@@ -83,7 +84,7 @@ jobs:
           syspulse --version
           syspulse
         "
-        echo "✓ Верификация пройдена!"
+        echo "Верификация пройдена!"
 
     - name: Save .deb as artifact
       if: always()
