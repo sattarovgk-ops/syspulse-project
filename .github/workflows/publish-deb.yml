@@ -60,7 +60,9 @@ jobs:
     - name: Upload .deb to Nexus
       run: |
         DEB=$(basename "${{ steps.pack.outputs.deb_path }}")
-        URL="http://${{ secrets.NEXUS_HOST }}:8081/repository/syspulse/${DEB}"
+        # ИСПОЛЬЗУЕМ ПРАВИЛЬНЫЙ ПУТЬ POOL ДЛЯ APT-РЕПОЗИТОРИЯ
+        URL="http://${{ secrets.NEXUS_HOST }}:8081/repository/syspulse/pool/main/s/syspulse/${DEB}"
+        
         echo "Отправка на URL: ${URL}"
         curl --fail --silent --show-error \
           --user "${{ secrets.NEXUS_USER }}:${{ secrets.NEXUS_PASSWORD }}" \
