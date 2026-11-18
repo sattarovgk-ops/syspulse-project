@@ -42,16 +42,16 @@ jobs:
         cp dist/syspulse "${ROOT}/usr/bin/${PKG}"
         chmod 755 "${ROOT}/usr/bin/${PKG}"
         
-        cat > "${ROOT}/DEBIAN/control" << EOF
-Package: ${PKG}
-Version: ${VER}
-Section: utils
-Priority: optional
-Architecture: amd64
-Maintainer: DevOps Team <devops@example.com>
-Description: Lightweight CLI tool for a system health snapshot
-Depends: libc6 (>= 2.17)
-EOF
+        # Создаем control файл БЕЗ использования EOF (чтобы YAML не ломался)
+        echo "Package: ${PKG}" > "${ROOT}/DEBIAN/control"
+        echo "Version: ${VER}" >> "${ROOT}/DEBIAN/control"
+        echo "Section: utils" >> "${ROOT}/DEBIAN/control"
+        echo "Priority: optional" >> "${ROOT}/DEBIAN/control"
+        echo "Architecture: amd64" >> "${ROOT}/DEBIAN/control"
+        echo "Maintainer: DevOps Team <devops@example.com>" >> "${ROOT}/DEBIAN/control"
+        echo "Description: Lightweight CLI tool for a system health snapshot" >> "${ROOT}/DEBIAN/control"
+        echo "Depends: libc6 (>= 2.17)" >> "${ROOT}/DEBIAN/control"
+        
         echo "deb_path=dist/${PKG}_${VER}_amd64.deb" >> $GITHUB_OUTPUT
 
     - name: Build .deb inside Docker
