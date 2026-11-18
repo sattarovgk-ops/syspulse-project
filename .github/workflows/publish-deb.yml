@@ -29,7 +29,7 @@ jobs:
         GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o dist/syspulse .
         echo "Бинарник собран: $(ls -lh dist/syspulse)"
 
-    - name: Package as .deb
+    - name: Prepare .deb structure
       id: pack
       run: |
         PKG=syspulse
@@ -37,14 +37,12 @@ jobs:
         echo "Сборка пакета ${PKG} версии ${VER}"
         echo "pkg_ver=${VER}" >> $GITHUB_OUTPUT
         
-        docker run --rm -v "$PWD:/app" -w /app ubuntu:22.04 bash -c "
-          set -e
-          ROOT=build/${PKG}_${VER}
-          mkdir -p \${ROOT}/DEBIAN \${ROOT}/usr/bin
-          cp dist/syspulse \${ROOT}/usr/bin/${PKG}
-          chmod 755 \${ROOT}/usr/bin/${PKG}
-          
-          cat > \${ROOT}/DEBIAN/control <<EOF
+        ROOT="build/${PKG}_${VER}"
+        mkdir -p "${ROOT}/DEBIAN" "${ROOT}/usr/bin"
+        cp dist/syspulse "${ROOT}/usr/bin/${PKG}"
+        chmod 755 "${ROOT}/usr/bin/${PKG}"
+        
+        cat > "${ROOT}/DEBIAN/control" << EOF
 Package: ${PKG}
 Version: ${VER}
 Section: utils
@@ -54,10 +52,11 @@ Maintainer: DevOps Team <devops@example.com>
 Description: Lightweight CLI tool for a system health snapshot
 Depends: libc6 (>= 2.17)
 EOF
-          
-          dpkg-deb --build --root-owner-group \${ROOT} dist/${PKG}_${VER}_amd64.deb
-        "
         echo "deb_path=dist/${PKG}_${VER}_amd64.deb" >> $GITHUB_OUTPUT
+
+    - name: Build .deb inside Docker
+      run: |
+        docker run --rm -v "$PWD:/app" -w /app ubuntu:22.04 bash -c "dpkg-deb --build --root-owner-group build/syspulse_${{ steps.pack.outputs.pkg_ver }} dist/syspulse_${{ steps.pack.outputs.pkg_ver }}_amd64.deb"
 
     - name: Upload .deb to Nexus
       run: |
