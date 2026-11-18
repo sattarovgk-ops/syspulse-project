@@ -1,4 +1,4 @@
-name: Build & Publish syspulse .deb to Nexus (APT)
+name: Build & Publish syspulse .deb to Nexus
 
 on:
   push:
@@ -7,8 +7,6 @@ on:
 
 env:
   GO_VERSION: "1.21"
-  APT_DIST: stable
-  APT_COMPONENT: main
 
 jobs:
   build-publish-verify:
@@ -57,31 +55,30 @@ jobs:
       run: |
         docker run --rm -v "$PWD:/app" -w /app ubuntu:22.04 bash -c "dpkg-deb --build --root-owner-group build/syspulse_${{ steps.pack.outputs.pkg_ver }} dist/syspulse_${{ steps.pack.outputs.pkg_ver }}_amd64.deb"
 
-    - name: Upload .deb to Nexus
+    - name: Upload .deb to Nexus Raw Repository
       run: |
-        # Теперь мы указываем полный путь до файла внутри контейнера
-        DEB_FILE="dist/$(basename "${{ steps.pack.outputs.deb_path }}")"
-        URL="http://host.docker.internal:8081/repository/syspulse/pool/main/s/syspulse/$(basename "${{ steps.pack.outputs.deb_path }}")"
+        DEB_FILE="dist/syspulse_${{ steps.pack.outputs.pkg_ver }}_amd64.deb"
+        URL="http://host.docker.internal:8081/repository/syspulse-raw/syspulse_${{ steps.pack.outputs.pkg_ver }}_amd64.deb"
         
         echo "Отправка на URL: ${URL}"
         docker run --rm -v "$PWD:/work" -w /work curlimages/curl \
           --fail --show-error \
           -u "${{ secrets.NEXUS_USER }}:${{ secrets.NEXUS_PASSWORD }}" \
           -X PUT \
-          -H "Content-Type: application/vnd.debian.binary-package" \
           --upload-file "${DEB_FILE}" \
           "${URL}"
-        echo "Пакет успешно загружен в Nexus!"
+        echo "Пакет успешно загружен в Raw-репозиторий!"
 
-    - name: Verify install via apt in Ubuntu container
+    - name: Verify install via dpkg in Ubuntu container
       run: |
         docker run --rm --add-host=host.docker.internal:host-gateway ubuntu:22.04 bash -c "
           set -e
           apt-get update -y
           apt-get install -y --no-install-recommends ca-certificates curl
-          echo 'deb [trusted=yes] http://host.docker.internal:8081/repository/syspulse/ ${{ env.APT_DIST }} ${{ env.APT_COMPONENT }}' > /etc/apt/sources.list.d/syspulse.list
-          apt-get update
-          apt-get install -y syspulse
+          echo 'Скачиваем пакет из Nexus...'
+          curl -o /tmp/syspulse.deb http://host.docker.internal:8081/repository/syspulse-raw/syspulse_${{ steps.pack.outputs.pkg_ver }}_amd64.deb
+          echo 'Устанавливаем пакет...'
+          dpkg -i /tmp/syspulse.deb || apt-get install -f -y
           echo '--- package info ---'
           dpkg -s syspulse | grep -E '^(Package|Version|Architecture)'
           echo '--- run app ---'
