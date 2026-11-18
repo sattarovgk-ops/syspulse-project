@@ -57,19 +57,20 @@ jobs:
       run: |
         docker run --rm -v "$PWD:/app" -w /app ubuntu:22.04 bash -c "dpkg-deb --build --root-owner-group build/syspulse_${{ steps.pack.outputs.pkg_ver }} dist/syspulse_${{ steps.pack.outputs.pkg_ver }}_amd64.deb"
 
-    - name: Upload .deb to Nexus
+    - name: Upload .deb to Nexus via REST API
       run: |
-        DEB=$(basename "${{ steps.pack.outputs.deb_path }}")
-        # ИСПОЛЬЗУЕМ ПРАВИЛЬНЫЙ ПУТЬ POOL ДЛЯ APT-РЕПОЗИТОРИЯ
-        URL="http://${{ secrets.NEXUS_HOST }}:8081/repository/syspulse/pool/main/s/syspulse/${DEB}"
+        DEB_FILE="${{ steps.pack.outputs.deb_path }}"
+        # Официальный эндпоинт для загрузки компонентов в Nexus 3
+        URL="http://${{ secrets.NEXUS_HOST }}:8081/service/rest/v1/components?repository=syspulse"
         
         echo "Отправка на URL: ${URL}"
-        curl --fail --silent --show-error \
-          --user "${{ secrets.NEXUS_USER }}:${{ secrets.NEXUS_PASSWORD }}" \
-          -H "Content-Type: application/vnd.debian.binary-package" \
-          --upload-file "${{ steps.pack.outputs.deb_path }}" \
-          "${URL}"
-        echo "Пакет ${DEB} успешно загружен в Nexus!"
+        curl --fail --show-error \
+          -u "${{ secrets.NEXUS_USER }}:${{ secrets.NEXUS_PASSWORD }}" \
+          -X POST "${URL}" \
+          -F "raw.directory=pool/main/s/syspulse" \
+          -F "raw.asset1=@${DEB_FILE};type=application/vnd.debian.binary-package" \
+          -F "raw.asset1.filename=$(basename ${DEB_FILE})"
+        echo "Пакет успешно загружен в Nexus!"
 
     - name: Verify install via apt in Ubuntu container
       run: |
