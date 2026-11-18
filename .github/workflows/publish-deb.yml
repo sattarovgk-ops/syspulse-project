@@ -33,7 +33,7 @@ jobs:
       id: pack
       run: |
         PKG=syspulse
-        VER=$(grep -oP 'const Version = "\K[0-9.]+' main.go)
+        VER=$(awk -F\" '/const Version/ {print $2}' main.go)
         echo "Сборка пакета ${PKG} версии ${VER}"
         echo "pkg_ver=${VER}" >> $GITHUB_OUTPUT
         ROOT=build/${PKG}_${VER}
