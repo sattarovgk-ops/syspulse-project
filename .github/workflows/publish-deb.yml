@@ -74,9 +74,9 @@ jobs:
         docker run --rm --add-host=host.docker.internal:host-gateway ubuntu:22.04 bash -c "
           set -e
           apt-get update -y
-          apt-get install -y --no-install-recommends ca-certificates curl
+          apt-get install -y --no-install-recommends ca-certificates curl libc6
           echo 'Скачиваем пакет из Nexus...'
-          curl -o /tmp/syspulse.deb http://host.docker.internal:8081/repository/syspulse-raw/syspulse_${{ steps.pack.outputs.pkg_ver }}_amd64.deb
+          curl -s -o /tmp/syspulse.deb http://host.docker.internal:8081/repository/syspulse-raw/syspulse_${{ steps.pack.outputs.pkg_ver }}_amd64.deb
           echo 'Устанавливаем пакет...'
           dpkg -i /tmp/syspulse.deb || apt-get install -f -y
           echo '--- package info ---'
