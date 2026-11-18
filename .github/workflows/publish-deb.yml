@@ -71,7 +71,7 @@ jobs:
 
     - name: Verify install via dpkg in Ubuntu container
       run: |
-        docker run --rm --add-host=host.docker.internal:host-gateway ubuntu:22.04 bash -c "
+        docker run --rm --platform linux/amd64 --add-host=host.docker.internal:host-gateway ubuntu:22.04 bash -c "
           set -e
           apt-get update -y
           apt-get install -y --no-install-recommends ca-certificates curl libc6
