@@ -57,20 +57,25 @@ jobs:
       run: |
         docker run --rm -v "$PWD:/app" -w /app ubuntu:22.04 bash -c "dpkg-deb --build --root-owner-group build/syspulse_${{ steps.pack.outputs.pkg_ver }} dist/syspulse_${{ steps.pack.outputs.pkg_ver }}_amd64.deb"
 
-    - name: Upload .deb to Nexus
+    - name: Upload .deb to Nexus using dput in Docker
       run: |
         DEB_FILE="${{ steps.pack.outputs.deb_path }}"
-        URL="http://${{ secrets.NEXUS_HOST }}:8081/service/rest/v1/components?repository=syspulse"
         
-        echo "Отправка на URL: ${URL}"
-        curl --fail --show-error \
-          -u "${{ secrets.NEXUS_USER }}:${{ secrets.NEXUS_PASSWORD }}" \
-          -X POST "${URL}" \
-          -F "apt.asset=@${DEB_FILE};type=application/vnd.debian.binary-package" \
-          -F "apt.asset.filename=$(basename ${DEB_FILE})" \
-          -F "apt.directory=pool/main/s/syspulse" \
-          -F "apt.distribution=stable" \
-          -F "apt.component=main"
+        cat > dput.cf << EOF
+        [syspulse]
+        method = http
+        fqdn = ${{ secrets.NEXUS_HOST }}:8081
+        incoming = /repository/syspulse/
+        login = ${{ secrets.NEXUS_USER }}
+        password = ${{ secrets.NEXUS_PASSWORD }}
+        allow_unsigned_uploads = 1
+        EOF
+        
+        
+        docker run --rm -v "$PWD:/work" -w /work ubuntu:22.04 bash -c "
+          apt-get update -y && apt-get install -y dput ca-certificates
+          dput -f syspulse syspulse_${{ steps.pack.outputs.pkg_ver }}_amd64.deb
+        "
         echo "Пакет успешно загружен в Nexus!"
 
     - name: Verify install via apt in Ubuntu container
