@@ -57,38 +57,19 @@ jobs:
       run: |
         docker run --rm -v "$PWD:/app" -w /app ubuntu:22.04 bash -c "dpkg-deb --build --root-owner-group build/syspulse_${{ steps.pack.outputs.pkg_ver }} dist/syspulse_${{ steps.pack.outputs.pkg_ver }}_amd64.deb"
 
-    - name: Upload .deb to Nexus via Python REST API
+    - name: Upload .deb to Nexus
       run: |
-        DEB_FILE="${{ steps.pack.outputs.deb_path }}"
+        DEB_FILE=$(basename "${{ steps.pack.outputs.deb_path }}")
+        URL="http://host.docker.internal:8081/repository/syspulse/pool/main/s/syspulse/${DEB_FILE}"
         
-        cat > upload.py << 'PYEOF'
-        import requests
-        import sys
-        
-        url = f"http://{sys.argv[1]}:8081/service/rest/v1/components?repository=syspulse"
-        user = sys.argv[2]
-        password = sys.argv[3]
-        file_path = sys.argv[4]
-        
-        files = {
-            'apt.asset': (file_path.split('/')[-1], open(file_path, 'rb'), 'application/vnd.debian.binary-package')
-        }
-        
-        data = {
-            'apt.directory': 'pool/main/s/syspulse'
-        }
-        
-        response = requests.post(url, auth=(user, password), files=files, data=data)
-        print(f"Status Code: {response.status_code}")
-        print(f"Response: {response.text}")
-        if response.status_code not in [200, 201, 204]:
-            sys.exit(1)
-        PYEOF
-        
-        docker run --rm -v "$PWD:/work" -w /work python:3.10-slim bash -c "
-          pip install requests -q
-          python upload.py host.docker.internal ${{ secrets.NEXUS_USER }} ${{ secrets.NEXUS_PASSWORD }} ${DEB_FILE}
-        "
+        echo "Отправка на URL: ${URL}"
+        docker run --rm -v "$PWD:/work" -w /work curlimages/curl \
+          --fail --show-error \
+          -u "${{ secrets.NEXUS_USER }}:${{ secrets.NEXUS_PASSWORD }}" \
+          -X PUT \
+          -H "Content-Type: application/vnd.debian.binary-package" \
+          --upload-file "${DEB_FILE}" \
+          "${URL}"
         echo "Пакет успешно загружен в Nexus!"
 
     - name: Verify install via apt in Ubuntu container
@@ -97,7 +78,7 @@ jobs:
           set -e
           apt-get update -y
           apt-get install -y --no-install-recommends ca-certificates curl
-          echo 'deb [trusted=yes] http://host.docker.internal:8081/repository/syspulse/ stable main' > /etc/apt/sources.list.d/syspulse.list
+          echo 'deb [trusted=yes] http://host.docker.internal:8081/repository/syspulse/ ${{ env.APT_DIST }} ${{ env.APT_COMPONENT }}' > /etc/apt/sources.list.d/syspulse.list
           apt-get update
           apt-get install -y syspulse
           echo '--- package info ---'
