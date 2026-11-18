@@ -36,23 +36,27 @@ jobs:
         VER=$(awk -F\" '/const Version/ {print $2}' main.go)
         echo "Сборка пакета ${PKG} версии ${VER}"
         echo "pkg_ver=${VER}" >> $GITHUB_OUTPUT
-        ROOT=build/${PKG}_${VER}
-        mkdir -p "${ROOT}/DEBIAN" "${ROOT}/usr/bin"
-        cp dist/syspulse "${ROOT}/usr/bin/${PKG}"
-        chmod 755 "${ROOT}/usr/bin/${PKG}"
         
-        cat > "${ROOT}/DEBIAN/control" <<EOF
-        Package: ${PKG}
-        Version: ${VER}
-        Section: utils
-        Priority: optional
-        Architecture: amd64
-        Maintainer: DevOps Team <devops@example.com>
-        Description: Lightweight CLI tool for a system health snapshot
-        Depends: libc6 (>= 2.17)
-        EOF
-        
-        dpkg-deb --build --root-owner-group "${ROOT}" "dist/${PKG}_${VER}_amd64.deb"
+        docker run --rm -v "$PWD:/app" -w /app ubuntu:22.04 bash -c "
+          set -e
+          ROOT=build/${PKG}_${VER}
+          mkdir -p \${ROOT}/DEBIAN \${ROOT}/usr/bin
+          cp dist/syspulse \${ROOT}/usr/bin/${PKG}
+          chmod 755 \${ROOT}/usr/bin/${PKG}
+          
+          cat > \${ROOT}/DEBIAN/control <<EOF
+Package: ${PKG}
+Version: ${VER}
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: DevOps Team <devops@example.com>
+Description: Lightweight CLI tool for a system health snapshot
+Depends: libc6 (>= 2.17)
+EOF
+          
+          dpkg-deb --build --root-owner-group \${ROOT} dist/${PKG}_${VER}_amd64.deb
+        "
         echo "deb_path=dist/${PKG}_${VER}_amd64.deb" >> $GITHUB_OUTPUT
 
     - name: Upload .deb to Nexus
@@ -64,21 +68,24 @@ jobs:
           -H "Content-Type: application/vnd.debian.binary-package" \
           --upload-file "${{ steps.pack.outputs.deb_path }}" \
           "${URL}"
-        echo "Пакет ${DEB} загружен в Nexus."
+        echo "✓ Пакет ${DEB} успешно загружен в Nexus!"
 
     - name: Verify install via apt in Ubuntu container
       run: |
         docker run --rm ubuntu:22.04 bash -c "
           set -e
           apt-get update -y
-          apt-get install -y ca-certificates curl
+          apt-get install -y --no-install-recommends ca-certificates curl
           echo 'deb [trusted=yes] http://${{ secrets.NEXUS_HOST }}:8081/repository/syspulse/ ${{ env.APT_DIST }} ${{ env.APT_COMPONENT }}' > /etc/apt/sources.list.d/syspulse.list
           apt-get update
           apt-get install -y syspulse
+          echo '--- package info ---'
+          dpkg -s syspulse | grep -E '^(Package|Version|Architecture)'
+          echo '--- run app ---'
           syspulse --version
           syspulse
         "
-        echo "Верификация пройдена!"
+        echo "✓ Верификация пройдена!"
 
     - name: Save .deb as artifact
       if: always()
