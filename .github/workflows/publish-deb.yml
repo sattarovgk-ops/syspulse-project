@@ -87,19 +87,21 @@ jobs:
             sys.exit(1)
         PYEOF
         
+        # Передаем host.docker.internal вместо localhost для доступа из контейнера к хосту
         docker run --rm -v "$PWD:/work" -w /work python:3.10-slim bash -c "
           pip install requests -q
-          python upload.py ${{ secrets.NEXUS_HOST }} ${{ secrets.NEXUS_USER }} ${{ secrets.NEXUS_PASSWORD }} ${DEB_FILE}
+          python upload.py host.docker.internal ${{ secrets.NEXUS_USER }} ${{ secrets.NEXUS_PASSWORD }} ${DEB_FILE}
         "
         echo "Пакет успешно загружен в Nexus!"
 
     - name: Verify install via apt in Ubuntu container
       run: |
-        docker run --rm ubuntu:22.04 bash -c "
+        # Добавляем --add-host, чтобы контейнер знал, где находится хост
+        docker run --rm --add-host=host.docker.internal:host-gateway ubuntu:22.04 bash -c "
           set -e
           apt-get update -y
           apt-get install -y --no-install-recommends ca-certificates curl
-          echo 'deb [trusted=yes] http://${{ secrets.NEXUS_HOST }}:8081/repository/syspulse/ ${{ env.APT_DIST }} ${{ env.APT_COMPONENT }}' > /etc/apt/sources.list.d/syspulse.list
+          echo 'deb [trusted=yes] http://host.docker.internal:8081/repository/syspulse/ ${{ env.APT_DIST }} ${{ env.APT_COMPONENT }}' > /etc/apt/sources.list.d/syspulse.list
           apt-get update
           apt-get install -y syspulse
           echo '--- package info ---'
